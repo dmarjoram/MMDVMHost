@@ -38,6 +38,7 @@ m_netState(RS_NET_IDLE),
 m_rfTimeoutTimer(1000U, timeout),
 m_netTimeoutTimer(1000U, timeout),
 m_packetTimer(1000U, 0U, 200U),
+m_debounceTimer(1000U, 1U, 200U), // 1 second debounce timer after TX
 m_networkWatchdog(1000U, 0U, 1500U),
 m_elapsed(),
 m_rfFrames(0U),
@@ -593,6 +594,12 @@ bool CYSFControl::processDNData(bool valid, unsigned char *data)
 			if (m_rfSource == NULL || m_rfDest == NULL)
 				return false;
 
+			// Check if we are sleeping before listening again
+			if (!m_debounceTimer.hasExpired()) {
+				LogMessage("YSF, received data while RX snooze. Ignoring.");
+				return false;
+			}
+
 			if (m_selfOnly) {
 				bool ret = checkCallsign(m_rfSource);
 				if (!ret) {
@@ -894,6 +901,10 @@ void CYSFControl::writeEndNet()
 		m_network->reset();
 }
 
+
+/// <summary>
+/// Read from network
+/// </summary>
 void CYSFControl::writeNetwork()
 {
 	unsigned char data[200U];
@@ -1042,6 +1053,9 @@ void CYSFControl::writeNetwork()
 
 	writeQueueNet(data + 33U);
 
+	// While transmitting, we constantly reset the debounce timer
+	m_debounceTimer.start();
+
 	m_packetTimer.start();
 	m_netFrames++;
 	m_netN = n;
@@ -1054,6 +1068,8 @@ void CYSFControl::writeNetwork()
 
 void CYSFControl::clock(unsigned int ms)
 {
+	m_debounceTimer.clock(ms);
+
 	if (m_network != NULL)
 		writeNetwork();
 
@@ -1093,6 +1109,9 @@ void CYSFControl::writeQueueRF(const unsigned char *data)
 	m_queue.addData(data, len);
 }
 
+/// <summary>
+/// Write network to RF queue
+/// </summary>
 void CYSFControl::writeQueueNet(const unsigned char *data)
 {
 	assert(data != NULL);
@@ -1221,6 +1240,7 @@ void CYSFControl::enable(bool enabled)
 		m_netTimeoutTimer.stop();
 		m_networkWatchdog.stop();
 		m_packetTimer.stop();
+		m_debounceTimer.stop();
 
 		m_netPayload.reset();
 	}
