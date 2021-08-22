@@ -561,7 +561,7 @@ int CMMDVMHost::run()
 		LogInfo("    Mode Hang: %us", m_ysfRFModeHang);
 		LogInfo("    Debounce Timeout: %ums", m_ysfDebounceTimeout);
 
-		m_ysf = new CYSFControl(m_callsign, selfOnly, m_ysfNetwork, m_display, m_timeout, m_duplex, lowDeviation, remoteGateway, m_ysfDebounceTimeout, rssi);
+		m_ysf = new CYSFControl(m_callsign, selfOnly, m_ysfNetwork, m_display, m_timeout, m_duplex, lowDeviation, remoteGateway, rssi);
 	}
 
 	if (m_p25Enabled) {

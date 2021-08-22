@@ -23,7 +23,7 @@
 
 // #define	DUMP_YSF
 
-CYSFControl::CYSFControl(const std::string& callsign, bool selfOnly, CYSFNetwork* network, CDisplay* display, unsigned int timeout, bool duplex, bool lowDeviation, bool remoteGateway, unsigned int debounceTimeout, CRSSIInterpolator* rssiMapper) :
+CYSFControl::CYSFControl(const std::string& callsign, bool selfOnly, CYSFNetwork* network, CDisplay* display, unsigned int timeout, bool duplex, bool lowDeviation, bool remoteGateway, CRSSIInterpolator* rssiMapper) :
 m_callsign(NULL),
 m_selfCallsign(NULL),
 m_selfOnly(selfOnly),
@@ -38,8 +38,8 @@ m_netState(RS_NET_IDLE),
 m_rfTimeoutTimer(1000U, timeout),
 m_netTimeoutTimer(1000U, timeout),
 m_packetTimer(1000U, 0U, 200U),
-m_debounceTimer(1000U, 0U, debounceTimeout),
-//m_debounceTimer(1000U, 1U, 200U), 
+//m_debounceTimer(1000U, 0U, debounceTimeout),
+m_debounceTimer(1000U, 1U, 400U), 
 m_networkWatchdog(1000U, 0U, 1500U),
 m_elapsed(),
 m_rfFrames(0U),
