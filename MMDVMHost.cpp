@@ -142,6 +142,7 @@ m_mode(MODE_IDLE),
 m_dstarRFModeHang(10U),
 m_dmrRFModeHang(10U),
 m_ysfRFModeHang(10U),
+m_ysfDebounceTimeout(1400U),
 m_p25RFModeHang(10U),
 m_nxdnRFModeHang(10U),
 m_dstarNetModeHang(3U),
@@ -550,6 +551,7 @@ int CMMDVMHost::run()
 		unsigned int txHang = m_conf.getFusionTXHang();
 		bool selfOnly       = m_conf.getFusionSelfOnly();
 		m_ysfRFModeHang     = m_conf.getFusionModeHang();
+		m_ysfDebounceTimeout = 1400U; // TODO: Update from config file
 
 		LogInfo("YSF RF Parameters");
 		LogInfo("    Low Deviation: %s", lowDeviation ? "yes" : "no");
@@ -557,8 +559,9 @@ int CMMDVMHost::run()
 		LogInfo("    TX Hang: %us", txHang);
 		LogInfo("    Self Only: %s", selfOnly ? "yes" : "no");
 		LogInfo("    Mode Hang: %us", m_ysfRFModeHang);
+		LogInfo("    Debounce Timeout: %ums", m_ysfDebounceTimeout);
 
-		m_ysf = new CYSFControl(m_callsign, selfOnly, m_ysfNetwork, m_display, m_timeout, m_duplex, lowDeviation, remoteGateway, rssi);
+		m_ysf = new CYSFControl(m_callsign, selfOnly, m_ysfNetwork, m_display, m_timeout, m_duplex, lowDeviation, remoteGateway, m_ysfDebounceTimeout, rssi);
 	}
 
 	if (m_p25Enabled) {

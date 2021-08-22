@@ -23,7 +23,7 @@
 
 // #define	DUMP_YSF
 
-CYSFControl::CYSFControl(const std::string& callsign, bool selfOnly, CYSFNetwork* network, CDisplay* display, unsigned int timeout, bool duplex, bool lowDeviation, bool remoteGateway, CRSSIInterpolator* rssiMapper) :
+CYSFControl::CYSFControl(const std::string& callsign, bool selfOnly, CYSFNetwork* network, CDisplay* display, unsigned int timeout, bool duplex, bool lowDeviation, bool remoteGateway, unsigned int debounceTimeout, CRSSIInterpolator* rssiMapper) :
 m_callsign(NULL),
 m_selfCallsign(NULL),
 m_selfOnly(selfOnly),
@@ -38,7 +38,8 @@ m_netState(RS_NET_IDLE),
 m_rfTimeoutTimer(1000U, timeout),
 m_netTimeoutTimer(1000U, timeout),
 m_packetTimer(1000U, 0U, 200U),
-m_debounceTimer(1000U, 1U, 200U), // 1 second debounce timer after TX
+m_debounceTimer(1000U, 0U, debounceTimeout),
+//m_debounceTimer(1000U, 1U, 200U), 
 m_networkWatchdog(1000U, 0U, 1500U),
 m_elapsed(),
 m_rfFrames(0U),
@@ -216,9 +217,9 @@ bool CYSFControl::writeModem(unsigned char *data, unsigned int len)
 	return ret;
 }
 
-bool CYSFControl::processVWData(bool valid, unsigned char *data)
+bool CYSFControl::processVWData(bool valid, unsigned char* data)
 {
-	unsigned char fi   = m_lastFICH.getFI();
+	unsigned char fi = m_lastFICH.getFI();
 	unsigned char dgid = m_lastFICH.getDGId();
 
 	if (valid && fi == YSF_FI_HEADER) {
@@ -287,13 +288,15 @@ bool CYSFControl::processVWData(bool valid, unsigned char *data)
 
 			return true;
 		}
-	} else if (valid && fi == YSF_FI_TERMINATOR) {
+	}
+	else if (valid && fi == YSF_FI_TERMINATOR) {
 		if (m_rfState == RS_RF_REJECTED) {
 			m_rfPayload.reset();
 			m_rfSource = NULL;
-			m_rfDest   = NULL;
-			m_rfState  = RS_RF_LISTENING;
-		} else if (m_rfState == RS_RF_AUDIO) {
+			m_rfDest = NULL;
+			m_rfState = RS_RF_LISTENING;
+		}
+		else if (m_rfState == RS_RF_AUDIO) {
 			m_rfPayload.processHeaderData(data + 2U);
 
 			CSync::addYSFSync(data + 2U);
@@ -325,8 +328,74 @@ bool CYSFControl::processVWData(bool valid, unsigned char *data)
 
 			writeEndRF();
 		}
-	} else {
-		if (m_rfState == RS_RF_AUDIO) {
+	}
+	else {
+
+		// ****************************************** TODO: DR - Support LISTENING state for VW
+
+		if (m_rfState == RS_RF_LISTENING) {
+
+			LogMessage("YSF, received RF late entry for VW mode. Using node callsign.");
+
+			if (m_rfSource == NULL) {
+				m_rfSource = new unsigned char[YSF_CALLSIGN_LENGTH];
+				::memcpy(m_rfSource, m_selfCallsign, YSF_CALLSIGN_LENGTH);
+			}
+
+			unsigned char cm = m_lastFICH.getCM();
+			if (cm == YSF_CM_GROUP1 || cm == YSF_CM_GROUP2)
+				m_rfDest = (unsigned char*)"ALL       ";
+			else
+				m_rfDest = m_rfPayload.getDest();
+
+			m_rfFrames = 0U;
+			m_rfErrs = 0U;
+			m_rfBits = 1U;
+			m_rfTimeoutTimer.start();
+			m_rfState = RS_RF_AUDIO;
+
+			m_minRSSI = m_rssi;
+			m_maxRSSI = m_rssi;
+			m_aveRSSI = m_rssi;
+			m_rssiCount = 1U;
+#if defined(DUMP_YSF)
+			openFile();
+#endif
+			m_display->writeFusion((char*)m_rfSource, (char*)m_rfDest, dgid, "R", "          ");
+			LogMessage("YSF, received RF header from %10.10s to DG-ID %u", m_rfSource, dgid);
+
+			CSync::addYSFSync(data + 2U);
+
+			CYSFFICH fich = m_lastFICH;
+
+			fich.encode(data + 2U);
+
+			data[0U] = TAG_DATA;
+			data[1U] = 0x00U;
+
+			writeNetwork(data, m_rfFrames % 128U);
+
+#if defined(DUMP_YSF)
+			writeFile(data + 2U);
+#endif
+			if (m_duplex) {
+				fich.setMR(m_remoteGateway ? YSF_MR_NOT_BUSY : YSF_MR_BUSY);
+				fich.setDev(m_lowDeviation);
+				fich.encode(data + 2U);
+				writeQueueRF(data);
+			}
+
+			m_rfFrames++;
+
+			m_display->writeFusionRSSI(m_rssi);
+
+			return true;
+		}
+
+		// ******************************************
+
+		else if (m_rfState == RS_RF_AUDIO) {
+			//if (m_rfState == RS_RF_AUDIO) {
 			// If valid is false, update the m_lastFICH for this transmission
 			if (!valid) {
 				// XXX Check these values
@@ -349,7 +418,8 @@ bool CYSFControl::processVWData(bool valid, unsigned char *data)
 				m_rfBits += 288U;
 				m_display->writeFusionBER(float(errors) / 2.88F);
 				LogDebug("YSF, V Mode 3, seq %u, AMBE FEC %u/288 (%.1f%%)", m_rfFrames % 128, errors, float(errors) / 2.88F);
-			} else {
+			}
+			else {
 				unsigned int errors = m_rfPayload.processVoiceFRModeAudio5(data + 2U);
 				m_rfErrs += errors;
 				m_rfBits += 720U;
@@ -379,11 +449,11 @@ bool CYSFControl::processVWData(bool valid, unsigned char *data)
 			m_display->writeFusionRSSI(m_rssi);
 
 			return true;
+			}
 		}
-	}
 
 	return false;
-}
+	}
 
 bool CYSFControl::processDNData(bool valid, unsigned char *data)
 {
@@ -868,6 +938,9 @@ void CYSFControl::writeEndRF()
 
 	m_rfTimeoutTimer.stop();
 	m_rfPayload.reset();
+
+	// Expire debounce timer on transmission lost
+	m_debounceTimer.clock(9999U);
 
 	// These variables are free'd by YSFPayload
 	m_rfSource = NULL;

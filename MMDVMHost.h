@@ -74,6 +74,7 @@ private:
   unsigned int    m_dstarRFModeHang;
   unsigned int    m_dmrRFModeHang;
   unsigned int    m_ysfRFModeHang;
+  unsigned int	  m_ysfDebounceTimeout;
   unsigned int    m_p25RFModeHang;
   unsigned int    m_nxdnRFModeHang;
   unsigned int    m_dstarNetModeHang;

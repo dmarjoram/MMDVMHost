@@ -35,7 +35,7 @@
 
 class CYSFControl {
 public:
-	CYSFControl(const std::string& callsign, bool selfOnly, CYSFNetwork* network, CDisplay* display, unsigned int timeout, bool duplex, bool lowDeviation, bool remoteGateway, CRSSIInterpolator* rssiMapper);
+	CYSFControl(const std::string& callsign, bool selfOnly, CYSFNetwork* network, CDisplay* display, unsigned int timeout, bool duplex, bool lowDeviation, bool remoteGateway, unsigned int debounceTimeout, CRSSIInterpolator* rssiMapper);
 	~CYSFControl();
 
 	bool writeModem(unsigned char* data, unsigned int len);
