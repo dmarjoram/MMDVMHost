@@ -230,6 +230,18 @@ bool CYSFControl::processVWData(bool valid, unsigned char* data)
 
 			m_rfSource = m_rfPayload.getSource();
 
+			// If source call sign is empty, set to node callsign
+			if (m_rfSource == NULL) {
+				m_rfSource = new unsigned char[YSF_CALLSIGN_LENGTH];
+				::memcpy(m_rfSource, m_selfCallsign, YSF_CALLSIGN_LENGTH);
+			}
+
+			// If source call sign is **********, set to node call sign
+			unsigned char* emptyCall = (unsigned char*)"**********";
+			if (::memcmp(m_rfSource, emptyCall, ::strlen((char*)emptyCall)) == 0) {
+				::memcpy(m_rfSource, m_selfCallsign, YSF_CALLSIGN_LENGTH);
+			}
+
 			if (m_selfOnly) {
 				bool ret = checkCallsign(m_rfSource);
 				if (!ret) {
@@ -331,14 +343,21 @@ bool CYSFControl::processVWData(bool valid, unsigned char* data)
 	}
 	else {
 
-		// ****************************************** TODO: DR - Support LISTENING state for VW
+		// ----------------------------------- TODO: DR - Support LISTENING state for VW
 
 		if (m_rfState == RS_RF_LISTENING) {
 
 			LogMessage("YSF, received RF late entry for VW mode. Using node callsign.");
 
+			// If source call sign is empty, set to node callsign
 			if (m_rfSource == NULL) {
 				m_rfSource = new unsigned char[YSF_CALLSIGN_LENGTH];
+				::memcpy(m_rfSource, m_selfCallsign, YSF_CALLSIGN_LENGTH);
+			}
+
+			// If source call sign is **********, set to node call sign
+			unsigned char* emptyCall = (unsigned char*)"**********";
+			if (::memcmp(m_rfSource, emptyCall, ::strlen((char*)emptyCall)) == 0) {
 				::memcpy(m_rfSource, m_selfCallsign, YSF_CALLSIGN_LENGTH);
 			}
 
@@ -392,7 +411,7 @@ bool CYSFControl::processVWData(bool valid, unsigned char* data)
 			return true;
 		}
 
-		// ******************************************
+		// ------------------------------------------------------------------------
 
 		else if (m_rfState == RS_RF_AUDIO) {
 			//if (m_rfState == RS_RF_AUDIO) {
@@ -666,8 +685,9 @@ bool CYSFControl::processDNData(bool valid, unsigned char *data)
 
 			// Check if we are sleeping before listening again
 			if (!m_debounceTimer.hasExpired()) {
-				LogMessage("YSF, received data while RX snooze. Ignoring.");
-				return false;
+//				LogMessage("YSF, received data while RX snooze. Ignoring.");
+				LogMessage("YSF, received data while RX snooze but snooze not enabled.");
+				//return false;
 			}
 
 			if (m_selfOnly) {
@@ -940,7 +960,7 @@ void CYSFControl::writeEndRF()
 	m_rfPayload.reset();
 
 	// Expire debounce timer on transmission lost
-	m_debounceTimer.clock(9999U);
+	m_debounceTimer.clock(4000U);
 
 	// These variables are free'd by YSFPayload
 	m_rfSource = NULL;
